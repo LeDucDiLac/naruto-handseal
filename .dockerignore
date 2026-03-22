@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.gitignore
+training/
+datasets/
+runs/
+*.pt
+*.pth
+README.md
+.env
+.vscode/
+.idea/

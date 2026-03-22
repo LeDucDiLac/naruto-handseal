@@ -1,0 +1,7 @@
+fastapi>=0.100.0
+uvicorn[standard]
+onnxruntime-gpu
+opencv-python-headless
+numpy
+python-multipart
+websockets

@@ -1,0 +1,22 @@
+# Naruto Hand Seal Detection Dataset
+# Configure paths after running download_dataset.py
+
+path: ./datasets/naruto-hand-seals/merged
+train: train/images
+val: valid/images
+test: test/images
+
+nc: 12
+names:
+  - bird
+  - boar
+  - dog
+  - dragon
+  - hare
+  - horse
+  - monkey
+  - ox
+  - ram
+  - rat
+  - snake
+  - tiger
