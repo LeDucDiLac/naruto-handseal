@@ -1,7 +1,7 @@
 fastapi>=0.100.0
 uvicorn[standard]
-onnxruntime-gpu
+onnxruntime-gpu==1.16.3
 opencv-python-headless
-numpy
+numpy<2
 python-multipart
 websockets

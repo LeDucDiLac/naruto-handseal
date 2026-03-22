@@ -197,6 +197,42 @@ async def get_hand_signs():
     })
 
 
+from pydantic import BaseModel
+
+class DetectRequest(BaseModel):
+    frame: str
+
+@app.post("/api/detect")
+async def api_detect(request: DetectRequest):
+    """Real-time detection via fast REST endpoint."""
+    if detector is None:
+        return {
+            "detections": [],
+            "inference_ms": 0,
+            "timestamp": time.time(),
+            "warning": "Model not loaded",
+        }
+    
+    try:
+        frame_bytes = base64.b64decode(request.frame)
+        frame_array = np.frombuffer(frame_bytes, dtype=np.uint8)
+        frame = cv2.imdecode(frame_array, cv2.IMREAD_COLOR)
+        
+        if frame is None:
+            return JSONResponse(status_code=400, content={"error": "Failed to decode frame"})
+            
+        start = time.perf_counter()
+        detections = detector.detect(frame)
+        inference_ms = (time.perf_counter() - start) * 1000
+        
+        return {
+            "detections": detections,
+            "inference_ms": round(inference_ms, 1),
+            "timestamp": time.time(),
+        }
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
 # ─── WebSocket Endpoint ──────────────────────────────────────────
 
 @app.websocket("/ws/detect")
@@ -285,5 +321,5 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8000,
         reload=True,
-        log_level="info",
+        log_level="warning",
     )

@@ -1,6 +1,6 @@
 gradio>=4.0.0
 requests
 websockets
-numpy
+numpy<2
 Pillow
 opencv-python-headless

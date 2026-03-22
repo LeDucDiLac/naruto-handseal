@@ -12,3 +12,6 @@ README.md
 .env
 .vscode/
 .idea/
+.venv/
+venv/
+ENV/

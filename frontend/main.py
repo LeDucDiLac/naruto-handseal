@@ -74,26 +74,18 @@ def load_effect_js(effect_type: str) -> str:
 seq_detector = SequenceDetector(hold_duration=0.5, sequence_timeout=5.0)
 
 
-# ─── WebSocket detection function ─────────────────────────────────
-async def detect_frame_ws(frame_data: bytes) -> dict:
-    """Send a frame to the backend via WebSocket and get detection results."""
-    try:
-        async with websockets.connect(WS_URL) as ws:
-            b64 = base64.b64encode(frame_data).decode("utf-8")
-            await ws.send(json.dumps({"frame": b64}))
-            response = await ws.recv()
-            return json.loads(response)
-    except Exception as e:
-        return {"detections": [], "error": str(e)}
-
+# ─── Frame transport ────────────────────────────────────────────────
+# Use a persistent requests session for low-latency HTTP keep-alive
+session = requests.Session()
 
 def detect_sync(frame_data: bytes) -> dict:
-    """Synchronous wrapper for WebSocket detection."""
+    """Send a frame to the backend via REST API immediately."""
     try:
-        loop = asyncio.new_event_loop()
-        result = loop.run_until_complete(detect_frame_ws(frame_data))
-        loop.close()
-        return result
+        b64 = base64.b64encode(frame_data).decode("utf-8")
+        url = f"{BACKEND_REST}/api/detect"
+        response = session.post(url, json={"frame": b64}, timeout=2.0)
+        response.raise_for_status()
+        return response.json()
     except Exception as e:
         return {"detections": [], "error": str(e)}
 
@@ -245,12 +237,6 @@ def create_app():
     custom_css = load_css()
     
     with gr.Blocks(
-        theme=gr.themes.Base(
-            primary_hue=gr.themes.colors.orange,
-            secondary_hue=gr.themes.colors.blue,
-            neutral_hue=gr.themes.colors.slate,
-        ),
-        css=custom_css,
         title="Naruto Jutsu Hand Sign Recognition",
     ) as demo:
         
@@ -310,11 +296,15 @@ def create_app():
                     )
                 
                 with gr.Row():
-                    with gr.Column(scale=2):
+                    with gr.Column(scale=1):
                         learn_webcam = gr.Image(
                             sources=["webcam"],
                             streaming=True,
                             label="Your Camera",
+                        )
+                    with gr.Column(scale=1):
+                        learn_output = gr.Image(
+                            label="Detection",
                         )
                     with gr.Column(scale=1):
                         learn_target = gr.Markdown("Select a jutsu to begin")
@@ -323,7 +313,7 @@ def create_app():
                 learn_webcam.stream(
                     fn=process_learn_frame,
                     inputs=[learn_webcam, learn_jutsu_select],
-                    outputs=[learn_webcam, learn_target, learn_progress],
+                    outputs=[learn_output, learn_target, learn_progress],
                     stream_every=0.1,
                 )
             
@@ -334,10 +324,14 @@ def create_app():
                 gr.Markdown("### Free-form detection — perform any jutsu from memory!")
                 
                 with gr.Row():
-                    with gr.Column(scale=2):
+                    with gr.Column(scale=1):
                         detect_webcam = gr.Image(
                             sources=["webcam"],
                             streaming=True,
+                            label="Your Camera",
+                        )
+                    with gr.Column(scale=1):
+                        detect_output = gr.Image(
                             label="Live Detection",
                         )
                     with gr.Column(scale=1):
@@ -352,7 +346,7 @@ def create_app():
                 detect_webcam.stream(
                     fn=process_frame,
                     inputs=[detect_webcam],
-                    outputs=[detect_webcam, detect_status, detect_progress, effects_html],
+                    outputs=[detect_output, detect_status, detect_progress, effects_html],
                     stream_every=0.066,  # ~15fps to backend (balances smoothness + load)
                 )
                 
@@ -383,4 +377,10 @@ if __name__ == "__main__":
         server_name="0.0.0.0",
         server_port=7860,
         share=False,
+        theme=gr.themes.Base(
+            primary_hue=gr.themes.colors.orange,
+            secondary_hue=gr.themes.colors.blue,
+            neutral_hue=gr.themes.colors.slate,
+        ),
+        css=load_css(),
     )

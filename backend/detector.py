@@ -85,19 +85,31 @@ class HandSignDetector:
 
         detections = []
         for det in output:
-            if len(det) < 5:
+            if len(det) == 6:
+                # NMS included (YOLOv10 / YOLO11 NMS export)
+                x1, y1, x2, y2, confidence, cls_id = det
+                class_id = int(cls_id)
+                confidence = float(confidence)
+            elif len(det) >= 5:
+                # Standard YOLOv8 format (cx, cy, w, h, class_scores...)
+                bbox, scores = det[:4], det[4:]
+                class_id = np.argmax(scores)
+                confidence = float(scores[class_id])
+                cx, cy, w, h = bbox
+                x1 = cx - w/2
+                y1 = cy - h/2
+                x2 = cx + w/2
+                y2 = cy + h/2
+            else:
                 continue
-            bbox, scores = det[:4], det[4:]
-            class_id = np.argmax(scores)
-            confidence = float(scores[class_id])
+                
             if confidence < self.confidence_threshold:
                 continue
 
-            cx, cy, w, h = bbox
-            x1 = max(0, min((cx - w/2 - pad_x) / scale, orig_w))
-            y1 = max(0, min((cy - h/2 - pad_y) / scale, orig_h))
-            x2 = max(0, min((cx + w/2 - pad_x) / scale, orig_w))
-            y2 = max(0, min((cy + h/2 - pad_y) / scale, orig_h))
+            x1 = max(0, min((x1 - pad_x) / scale, orig_w))
+            y1 = max(0, min((y1 - pad_y) / scale, orig_h))
+            x2 = max(0, min((x2 - pad_x) / scale, orig_w))
+            y2 = max(0, min((y2 - pad_y) / scale, orig_h))
 
             class_name = CLASSES[class_id] if class_id < len(CLASSES) else f"class_{class_id}"
             detections.append({
