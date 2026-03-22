@@ -28,6 +28,27 @@ def train(data_yaml: str, model_size: str = "n", epochs: int = 100,
     print(f"Loading pretrained model: {model_name}")
     model = YOLO(model_name)
     
+    # Add overall epoch progress bar using tqdm
+    try:
+        from tqdm import tqdm
+        pbar = tqdm(total=epochs, desc="Overall Training Progress", unit="epoch")
+        
+        def on_train_epoch_end(trainer):
+            pbar.update(1)
+            # Update description with current metrics if desired
+            if hasattr(trainer, 'metrics') and trainer.metrics:
+                map50 = trainer.metrics.get('metrics/mAP50(B)', 0)
+                pbar.set_description(f"Overall Progress (mAP50: {map50:.3f})")
+                
+        def on_train_end(trainer):
+            pbar.close()
+            
+        model.add_callback("on_train_epoch_end", on_train_epoch_end)
+        model.add_callback("on_train_end", on_train_end)
+    except ImportError:
+        pbar = None
+        print("tqdm not installed. Skipping overall progress bar.")
+    
     # Train
     print(f"\nStarting training for {epochs} epochs...")
     print(f"  Dataset: {data_yaml}")
@@ -35,6 +56,7 @@ def train(data_yaml: str, model_size: str = "n", epochs: int = 100,
     print(f"  Batch size: {batch}")
     print(f"  Device: {device}")
     print()
+
     
     results = model.train(
         data=data_yaml,
