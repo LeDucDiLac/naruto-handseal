@@ -1,6 +1,9 @@
 models/
 # Python virtual environments
 .venv/
+.env
+.env.*
+*.env
 venv/
 ENV/
 
@@ -16,3 +19,12 @@ __pycache__/
 *.pt
 *.onnx
 *:Zone.Identifier
+
+#datasets
+datasets/
+Naruto-hand-sign-1/
+
+#runs
+runs/
+
+DEV_LOG.md
