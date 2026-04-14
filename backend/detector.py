@@ -14,13 +14,14 @@ except ImportError:
 
 
 CLASSES = [
-    "bird", "boar", "dog", "dragon", "hare", "horse",
+    "bird", "boar", "clap", "dog", "dragon", "hare", "horse",
     "monkey", "ox", "ram", "rat", "snake", "tiger"
 ]
 
 CLASS_COLORS = {
     "bird":    (0, 200, 255),
     "boar":    (80, 127, 255),
+    "clap":    (200, 255, 0),
     "dog":     (255, 165, 0),
     "dragon":  (0, 0, 255),
     "hare":    (200, 200, 200),
@@ -37,7 +38,7 @@ CLASS_COLORS = {
 class HandSignDetector:
     """YOLO26 ONNX Runtime detector for Naruto hand signs."""
 
-    def __init__(self, model_path: str = "models/best.onnx",
+    def __init__(self, model_path: str = "models/best_model_v2_dataset.onnx",
                  confidence_threshold: float = 0.5,
                  iou_threshold: float = 0.45):
         self.confidence_threshold = confidence_threshold

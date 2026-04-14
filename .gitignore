@@ -22,6 +22,7 @@ __pycache__/
 #datasets
 datasets/
 Naruto-hand-sign-1/
+Naruto*/
 
 #runs
 runs/

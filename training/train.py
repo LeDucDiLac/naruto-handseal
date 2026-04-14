@@ -4,8 +4,40 @@ Fine-tunes a pretrained YOLO26 nano model and exports to ONNX format.
 """
 
 import argparse
+import json
 from pathlib import Path
 from ultralytics import YOLO
+
+
+def _resolve_project_root(project_root: str | None = None) -> Path:
+    if project_root:
+        return Path(project_root).expanduser().resolve()
+    return Path(__file__).resolve().parent.parent
+
+
+def _resolve_data_yaml(data_yaml: str, project_root: Path) -> Path:
+    candidate = Path(data_yaml).expanduser()
+    if candidate.is_absolute():
+        return candidate
+
+    if candidate.exists():
+        return candidate.resolve()
+
+    root_candidate = (project_root / candidate)
+    if root_candidate.exists():
+        return root_candidate.resolve()
+
+    training_candidate = (project_root / "training" / candidate)
+    if training_candidate.exists():
+        return training_candidate.resolve()
+
+    return candidate.resolve()
+
+
+def _save_latest_paths(metadata_path: Path, payload: dict) -> None:
+    metadata_path.parent.mkdir(parents=True, exist_ok=True)
+    with metadata_path.open("w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
 
 
 def train(data_yaml: str, model_size: str = "n", epochs: int = 100,
@@ -58,7 +90,7 @@ def train(data_yaml: str, model_size: str = "n", epochs: int = 100,
     print()
 
     
-    results = model.train(
+    model.train(
         data=data_yaml,
         epochs=epochs,
         imgsz=imgsz,
@@ -93,7 +125,7 @@ def train(data_yaml: str, model_size: str = "n", epochs: int = 100,
     return str(best_model_path)
 
 
-def export_onnx(model_path: str, output_dir: str = "../models"):
+def export_onnx(model_path: str, output_dir: str):
     """
     Export trained model to ONNX format for production inference.
     
@@ -118,7 +150,7 @@ def export_onnx(model_path: str, output_dir: str = "../models"):
     output_path.mkdir(parents=True, exist_ok=True)
     
     import shutil
-    dest = output_path / "best.onnx"
+    dest = output_path / "yolo26s.onnx"
     shutil.copy2(onnx_path, dest)
     
     print(f"ONNX model exported to: {dest}")
@@ -132,7 +164,7 @@ def main():
     parser.add_argument("--data", type=str, required=True,
                         help="Path to data.yaml")
     parser.add_argument("--model-size", type=str, default="n",
-                        choices=["n", "s", "m", "l", "x"],
+                        choices=["n", "s", "m", "l", "x"],  
                         help="YOLO26 model size (default: n=nano)")
     parser.add_argument("--epochs", type=int, default=100,
                         help="Training epochs (default: 100)")
@@ -142,25 +174,70 @@ def main():
                         help="Input image size (default: 640)")
     parser.add_argument("--device", type=str, default="0",
                         help="Device: '0' for GPU, 'cpu' for CPU")
-    parser.add_argument("--output", type=str, default="./runs",
+    parser.add_argument("--output", type=str, default=None,
                         help="Output directory for training results")
+    parser.add_argument("--onnx-output", type=str, default=None,
+                        help="Directory to store exported ONNX model")
     parser.add_argument("--export-only", type=str, default=None,
                         help="Skip training, only export existing .pt model to ONNX")
+    parser.add_argument("--project-root", type=str, default=None,
+                        help="Project root path (auto-detected by default)")
+    parser.add_argument("--no-export", action="store_true",
+                        help="Skip ONNX export after training")
     args = parser.parse_args()
 
+    project_root = _resolve_project_root(args.project_root)
+    default_runs_dir = project_root / "runs"
+    default_onnx_dir = project_root / "models"
+    output_dir = Path(args.output).expanduser().resolve() if args.output else default_runs_dir
+    onnx_output_dir = Path(args.onnx_output).expanduser().resolve() if args.onnx_output else default_onnx_dir
+    latest_paths_file = project_root / "training" / "latest_paths.json"
+
+    print(f"Project root: {project_root}")
+    print(f"Training output dir: {output_dir}")
+    print(f"ONNX output dir: {onnx_output_dir}")
+
     if args.export_only:
-        export_onnx(args.export_only)
+        model_path = Path(args.export_only).expanduser().resolve()
+        onnx_path = export_onnx(str(model_path), str(onnx_output_dir))
+        _save_latest_paths(
+            latest_paths_file,
+            {
+                "project_root": str(project_root),
+                "data_yaml": None,
+                "best_pt": str(model_path),
+                "run_dir": str(model_path.parent.parent) if model_path.parent.name == "weights" else None,
+                "onnx": str(Path(onnx_path).resolve()),
+            },
+        )
+        print(f"Latest paths saved to: {latest_paths_file}")
     else:
+        resolved_data_yaml = _resolve_data_yaml(args.data, project_root)
         best_model = train(
-            data_yaml=args.data,
+            data_yaml=str(resolved_data_yaml),
             model_size=args.model_size,
             epochs=args.epochs,
             batch=args.batch,
             imgsz=args.imgsz,
             device=args.device,
-            output_dir=args.output,
+            output_dir=str(output_dir),
         )
-        export_onnx(best_model)
+
+        onnx_path = None
+        if not args.no_export:
+            onnx_path = export_onnx(best_model, str(onnx_output_dir))
+
+        _save_latest_paths(
+            latest_paths_file,
+            {
+                "project_root": str(project_root),
+                "data_yaml": str(resolved_data_yaml),
+                "best_pt": str(Path(best_model).resolve()),
+                "run_dir": str((output_dir / "naruto-handsign").resolve()),
+                "onnx": str(Path(onnx_path).resolve()) if onnx_path else None,
+            },
+        )
+        print(f"Latest paths saved to: {latest_paths_file}")
 
 
 if __name__ == "__main__":

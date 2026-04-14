@@ -70,6 +70,60 @@ python evaluate.py --model runs/naruto-handsign/weights/best.pt \
 | 💧 Water Dragon | 42 signs | Water |
 | 🌪️ Wind Scythe | Rat | Wind |
 
+## Project Structure
+
+```text
+jutsu-handsign/
+├── DEV_LOG.md
+├── README.md
+├── docker-compose.yml
+├── backend/
+│   ├── Dockerfile
+│   ├── detector.py
+│   ├── main.py
+│   └── requirements.txt
+├── frontend/
+│   ├── Dockerfile
+│   ├── custom.css
+│   ├── jutsu_data.py
+│   ├── main.py
+│   ├── requirements.txt
+│   ├── sequence_detector.py
+│   └── effects/
+│       ├── clone_effect.js
+│       ├── fire_effect.js
+│       ├── lightning_effect.js
+│       ├── water_effect.js
+│       └── wind_effect.js
+├── models/
+│   ├── benchmark_inference.py
+│   ├── live_inference.py
+│   ├── best.onnx
+│   ├── yolo26s.onnx
+│   └── yolo26s.pt
+├── runs/
+│   └── detect/
+│       └── eval_results/
+└── training/
+    ├── analyze.py
+    ├── best.onnx
+    ├── best.pt
+    ├── data.yaml
+    ├── download_dataset.py
+    ├── download_from_roboflow.py
+    ├── evaluate.py
+    ├── requirements.txt
+    ├── train.py
+    ├── eval_results/
+    └── Naruto-hand-sign-1/
+        ├── data.yaml
+        ├── README.dataset.txt
+        ├── README.roboflow.txt
+        ├── test/
+        ├── train/
+        └── valid/
+```
+
 ## Tech Stack
 
 - **ML**: YOLO26 (Ultralytics) → ONNX Runtime (GPU)

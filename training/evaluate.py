@@ -4,6 +4,7 @@ Generates confusion matrix, per-class metrics, and visualizations.
 """
 
 import argparse
+import json
 from pathlib import Path
 
 from ultralytics import YOLO
@@ -13,6 +14,84 @@ CLASSES = [
     "bird", "boar", "dog", "dragon", "hare", "horse",
     "monkey", "ox", "ram", "rat", "snake", "tiger"
 ]
+
+
+def _resolve_project_root(project_root: str | None = None) -> Path:
+    if project_root:
+        return Path(project_root).expanduser().resolve()
+    return Path(__file__).resolve().parent.parent
+
+
+def _load_latest_paths(project_root: Path) -> dict:
+    latest_paths_file = project_root / "training" / "latest_paths.json"
+    if latest_paths_file.exists():
+        try:
+            with latest_paths_file.open("r", encoding="utf-8") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return {}
+    return {}
+
+
+def _find_latest_best_pt(project_root: Path) -> Path | None:
+    candidates = list(project_root.glob("runs/**/weights/best.pt"))
+    if not candidates:
+        return None
+    return max(candidates, key=lambda p: p.stat().st_mtime)
+
+
+def _resolve_model_path(model_path: str | None, project_root: Path, latest: dict) -> Path:
+    if model_path:
+        return Path(model_path).expanduser().resolve()
+
+    latest_best = latest.get("best_pt") if isinstance(latest, dict) else None
+    if latest_best:
+        candidate = Path(latest_best).expanduser().resolve()
+        if candidate.exists():
+            return candidate
+
+    discovered = _find_latest_best_pt(project_root)
+    if discovered:
+        return discovered.resolve()
+
+    raise FileNotFoundError(
+        "Could not resolve model path. Pass --model or run training first to create training/latest_paths.json."
+    )
+
+
+def _resolve_data_yaml(data_yaml: str | None, project_root: Path, latest: dict) -> Path:
+    if data_yaml:
+        candidate = Path(data_yaml).expanduser()
+        if candidate.is_absolute():
+            return candidate
+        if candidate.exists():
+            return candidate.resolve()
+        root_candidate = (project_root / candidate)
+        if root_candidate.exists():
+            return root_candidate.resolve()
+        training_candidate = (project_root / "training" / candidate)
+        if training_candidate.exists():
+            return training_candidate.resolve()
+        return candidate.resolve()
+
+    latest_data = latest.get("data_yaml") if isinstance(latest, dict) else None
+    if latest_data:
+        candidate = Path(latest_data).expanduser().resolve()
+        if candidate.exists():
+            return candidate
+
+    fallback_candidates = [
+        project_root / "training" / "Naruto-hand-sign-1" / "data.yaml",
+        project_root / "training" / "data.yaml",
+        project_root / "data.yaml",
+    ]
+    for candidate in fallback_candidates:
+        if candidate.exists():
+            return candidate.resolve()
+
+    raise FileNotFoundError(
+        "Could not resolve data.yaml path. Pass --data explicitly."
+    )
 
 
 def evaluate(model_path: str, data_yaml: str, device: str = "0",
@@ -121,22 +200,35 @@ def compare_inference_speed(pt_path: str, onnx_path: str, device: str = "0"):
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate YOLO26 hand seal model")
-    parser.add_argument("--model", type=str, required=True,
-                        help="Path to trained model (.pt)")
-    parser.add_argument("--data", type=str, required=True,
-                        help="Path to data.yaml")
+    parser.add_argument("--model", type=str, default=None,
+                        help="Path to trained model (.pt). If omitted, auto-detects latest best.pt")
+    parser.add_argument("--data", type=str, default=None,
+                        help="Path to data.yaml. If omitted, uses latest_paths.json or common defaults")
     parser.add_argument("--device", type=str, default="0",
                         help="Device: '0' for GPU, 'cpu' for CPU")
-    parser.add_argument("--output", type=str, default="./eval_results",
+    parser.add_argument("--output", type=str, default=None,
                         help="Output directory for evaluation results")
     parser.add_argument("--compare-onnx", type=str, default=None,
                         help="Path to ONNX model for speed comparison")
+    parser.add_argument("--project-root", type=str, default=None,
+                        help="Project root path (auto-detected by default)")
     args = parser.parse_args()
+
+    project_root = _resolve_project_root(args.project_root)
+    latest = _load_latest_paths(project_root)
+    model_path = _resolve_model_path(args.model, project_root, latest)
+    data_yaml = _resolve_data_yaml(args.data, project_root, latest)
+    output_dir = Path(args.output).expanduser().resolve() if args.output else (project_root / "eval_results")
+
+    print(f"Project root: {project_root}")
+    print(f"Model path: {model_path}")
+    print(f"Data yaml: {data_yaml}")
+    print(f"Eval output dir: {output_dir}")
     
-    evaluate(args.model, args.data, args.device, args.output)
+    evaluate(str(model_path), str(data_yaml), args.device, str(output_dir))
     
     if args.compare_onnx:
-        compare_inference_speed(args.model, args.compare_onnx, args.device)
+        compare_inference_speed(str(model_path), args.compare_onnx, args.device)
 
 
 if __name__ == "__main__":

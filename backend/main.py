@@ -28,7 +28,7 @@ detector: HandSignDetector | None = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global detector
-    model_path = os.environ.get("MODEL_PATH", "models/best.onnx")
+    model_path = os.environ.get("MODEL_PATH", "models/best_model_v2_dataset.onnx")
     
     # Check if model exists, provide helpful error if not
     if not Path(model_path).exists():

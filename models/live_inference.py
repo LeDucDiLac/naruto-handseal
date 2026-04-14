@@ -49,16 +49,27 @@ def main() -> None:
         st.code("pip install streamlit-webrtc av")
         st.stop()
 
-    model_path = str(Path("models") / "best.onnx")
-    model = _load_model(model_path)
-    model.overrides["task"] = "detect"
-
+    models_dir = Path(__file__).resolve().parent
+    model_files = list(models_dir.glob("*.pt")) + list(models_dir.glob("*.onnx"))
+    model_names = [f.name for f in model_files]
+    
     col1, col2 = st.columns([2, 1])
     with col2:
+        if not model_names:
+            st.error(f"No .pt or .onnx models found in {models_dir}")
+            st.stop()
+            
+        default_index = model_names.index("yolo26s.pt") if "yolo26s.pt" in model_names else 0
+        selected_model_name = st.selectbox("Select Model", options=model_names, index=default_index)
+        model_path = str(models_dir / selected_model_name)
+        model = _load_model(model_path)
+        model.overrides["task"] = "detect"
+
         conf = st.slider("Confidence", min_value=0.01, max_value=0.90, value=0.15, step=0.01)
         imgsz = st.selectbox("Image size", options=[256, 320, 416, 480, 640], index=1)
         frame_skip = st.selectbox("Process every Nth frame", options=[1, 2, 3, 4], index=1)
         infer_scale = st.selectbox("Inference scale", options=[1.0, 0.75, 0.5], index=1)
+        st.info(f"Loaded: {selected_model_name}")
         st.info("Allow camera access in the browser prompt.")
 
     test_image = st.file_uploader("Quick test image (optional)", type=["jpg", "jpeg", "png"])
